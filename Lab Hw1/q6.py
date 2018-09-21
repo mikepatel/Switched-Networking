@@ -20,6 +20,7 @@ import sys
 ############################################################
 def get_mask(x):
     x = np.ceil(np.log2(int(x)))  # return number of bits
+    x = 32 - int(x)
     return int(x)
 
 
