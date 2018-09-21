@@ -1,8 +1,10 @@
-Linux Ubuntu 16 VCL
+Linux Ubuntu 16.04 LTS Base VCL
 
 sudo python3 -m pip uninstall pip && sudo apt install python3-pip --reinstall
 pip3 install netifaces
 pip3 install numpy
+pip3 install sys
 
-python3 .py
+python3 q5.py
+python3 q6.py <ip address> <number of hosts>
 

@@ -18,10 +18,8 @@ import sys
 
 
 ############################################################
-def next_power_of_2(x):
+def get_mask(x):
     x = np.ceil(np.log2(int(x)))  # return number of bits
-    # print(x)
-    # x = np.power(2, x)
     return int(x)
 
 
@@ -31,8 +29,5 @@ if __name__ == "__main__":
     # print(args)
     ip_addr = args[1]
     num_hosts = args[2]
-    # print(ip_addr)
-    # print(num_hosts)
-    t = next_power_of_2(num_hosts)
-    mask = 32 - t
+    mask = get_mask(num_hosts)
     print(ip_addr + "/" + str(mask))
