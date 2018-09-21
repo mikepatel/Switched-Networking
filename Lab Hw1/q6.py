@@ -24,11 +24,17 @@ def get_mask(x):
     return int(x)
 
 
+def get_ip(x):
+    x = x.split("/")
+    return x[0]
+
+
 ############################################################
 if __name__ == "__main__":
     args = sys.argv
     # print(args)
     ip_addr = args[1]
     num_hosts = args[2]
+    ip_addr = get_ip(ip_addr)
     mask = get_mask(num_hosts)
     print(ip_addr + "/" + str(mask))
