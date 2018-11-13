@@ -4,6 +4,7 @@ import paramiko
 import time
 import sys
 import networkx as nx
+import os
 
 # https://networkx.github.io/documentation/latest/_downloads/networkx_reference.pdf
 
@@ -15,6 +16,17 @@ Adjacent Node details:
 3. local-interface vlan number
 4. adjacent node's interface number
 5. adjacent node's vlan number
+
+'''
+
+'''
+TO DO:
+# TO DO: read list of management IPs from text file instead of command line arguments
+# check enable passwords on switches
+# check ssh image
+# check ssh configured
+# show int trunk to get vlan info for interfaces
+# prompt user for root per vlan
 
 '''
 
@@ -34,9 +46,15 @@ def spanning_tree_from_edges(edges):
 
 
 ##
+# read in list of ip addresses from file
+ip_file = os.path.join(os.getcwd(), "577_ip_list.txt")
+IPs= []
+with open(ip_file, "r+") as f:
+    for line in f:
+        IPs.append(line.strip())
 
-# TO DO: read list of management IPs from text file instead of command line arguments
 
+'''
 # read in list of ip addresses as argument
 i=1
 IPs = []
@@ -45,6 +63,7 @@ for arg in sys.argv:
 		i = i + 1
 		continue
 	IPs.append(arg)
+'''
 
 # Ask user which switch to make root
 print("\nList of nodes by IP address: ", IPs)
@@ -132,7 +151,7 @@ print("#######################\n")
 #print("\nNodes by IP address: ", nodes_by_IP)
 
 tree, all_edges = spanning_tree_from_edges(Edges)
-#print("\nTree: ", sorted(tree.edges()))
+print("\nTree: (start_node, dest_node) ", sorted(tree.edges()))
 #print("\nAll edges: ", all_edges)
 
 
@@ -187,7 +206,8 @@ for link in missing_links:
 					configIPs[sIP] = Nodes[node][neighbor]["Local Node Interface"]
 					configIPs[dIP] = Nodes[node][neighbor]["Adjacent Node Interface"]
 
-print("\nConfig IPs: ", configIPs)
+
+print("\nIPs and interfaces that need to be re-configured: ", configIPs)
 
 # re-configure trunk links -> take off vlan
 for ip in configIPs:
@@ -208,7 +228,26 @@ for ip in configIPs:
 	shell.send("terminal length 0\n")  # forces terminal to print everything; no space needed
 	time.sleep(1)
 
+	print("\n##############################")
 	shell.send("enable\n")
+	time.sleep(1)
+
+	shell.send("exam\n")
+	time.sleep(1)
+
+	shell.send("show int trunk\n")  # before configuration
+	time.sleep(1)
+
+	# show spanning-tree vlan
+
+	shell.send("conf t\n")
+	command = "interface " + configIPs[ip] + "\n"
+	shell.send(command)
+	shell.send("switchport trunk allowed vlan 1,20\n")  # remove vlan 10
+	shell.send("end\n")
+	time.sleep(3)
+
+	shell.send("show int trunk\n")  # after configuration
 	time.sleep(1)
 
 	output = shell.recv(65535)
