@@ -23,6 +23,10 @@ time.sleep(1)
 shell.send("exam\n")  # assume enable password is "exam"
 time.sleep(1)
 
+shell.send("show int trunk\n")
+time.sleep(2)
+
+'''
 shell.send("conf t\n")
 time.sleep(1)
 
@@ -31,7 +35,32 @@ time.sleep(3)
 
 shell.send("end\n")
 time.sleep(1)
+'''
 
 output = shell.recv(65535)
 output = output.decode("utf-8")
-print(output)
+output = str(output)
+output.strip("\r\n")
+#print(output)
+
+if "Vlans allowed on trunk" in output:
+    vlans = output.split("Vlans allowed on trunk")
+
+#print(vlans[1])
+x = str(vlans[1])
+x = x.strip("\r\n")
+#print(x)
+
+print("##")
+vlans = x.split("\r\n\r\nPort")
+#print(vlans[0])
+y = str(vlans[0])
+print("##")
+y = y.split("\r\n")
+#print(y)
+q = []
+for z in y:
+    z = z.split("       ")
+    #print(z)
+    q.append(z)
+print(q)

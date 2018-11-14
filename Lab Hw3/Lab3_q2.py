@@ -48,7 +48,7 @@ def spanning_tree_from_edges(edges):
 ##
 # read in list of ip addresses from file
 ip_file = os.path.join(os.getcwd(), "577_ip_list.txt")
-IPs= []
+IPs = []
 with open(ip_file, "r+") as f:
     for line in f:
         IPs.append(line.strip())
@@ -65,16 +65,15 @@ for arg in sys.argv:
 	IPs.append(arg)
 '''
 
-# Ask user which switch to make root
-print("\nList of nodes by IP address: ", IPs)
-root = input("\nSpecify root node by IP address: ")
 
-# going to be sneaky and move 'root' to front of list
-IPs.insert(0, IPs.pop(IPs.index(root)))
+#print(root)
+
+
 #print(IPs)
 
 Nodes = {}
 nodes_visited = {}
+vlan_list = []
 
 for remoteIP in IPs:
 	#remoteIP = "169.254.231.151"
@@ -94,9 +93,9 @@ for remoteIP in IPs:
 	#output = shell.recv(65535)
 	#print(output)
 	shell.send("terminal length 0\n")  # forces terminal to print everything; no space needed
-	time.sleep(5)
+	time.sleep(1)
 	shell.send("show cdp neighbors detail\n")
-	time.sleep(5)
+	time.sleep(1)
 	output = shell.recv(65535)
 	#print(output)
 
@@ -117,100 +116,86 @@ for remoteIP in IPs:
 			if "Interface: " in item2:
 				Neighbors[neighbor_name]["Local Node Interface"] = item2.split("Interface: ")[1].split(",  Port ID (outgoing port): ")[0]
 				Neighbors[neighbor_name]["Adjacent Node Interface"] = item2.split("Interface: ")[1].split(",  Port ID (outgoing port): ")[1]
+
+			'''
 			if "Native VLAN: " in item2:
 				Neighbors[neighbor_name]["Local VLAN"] = item2.split("Native VLAN: ")[1]
 				Neighbors[neighbor_name]["Adjacent VLAN"] = item2.split("Native VLAN: ")[1]
+			'''
+
 			if "IP address: " in item2:
 				Neighbors[neighbor_name]["Management IP"] = item2.split("IP address: ")[1]
 
 	Nodes[remoteIP] = Neighbors
-	
-	
+
+
+	shell.send("show int trunk\n")
+	time.sleep(2)
+
+	output = shell.recv(65535)
+	output = output.decode("utf-8")
+	##print("\n@@")
+	#print(output)
+	x = output.split("Vlans allowed on trunk")
+	x = str(x[1])
+	x = x.strip("\r\n").split("\r\n\r\nPort")
+	x = str(x[0])
+	x = x.split("\r\n")
+	vlans = []
+	for y in x:
+		y = y.split("       ")
+		vlans.append(y[1])
+
+	vlan_list.append(vlans[0])
+
+	for neighbor in Nodes[remoteIP]:
+		Nodes[remoteIP][neighbor]["Local VLAN"] = vlans[0]
+		Nodes[remoteIP][neighbor]["Adjacent VLAN"] = vlans[0]
+
+
 	
 #####
-## Graph -> Tree
-# initialize all to not visited
+#print("\n@@")
+vlan_list = vlan_list[0]
+vlan_list = str(vlan_list).split(",")
+#print(vlan_list)
 
+root_IPs = {}
+for v in vlan_list:
+	print("\n##################################################################")
+	print("\n##################################################################")
+	print("\n##################################################################")
+	print("\nList of nodes by IP address: ", IPs)
+	row = {}
+	copy_IPs = []
+	for i in IPs:
+		copy_IPs.append(i)
 
-Edges = []
-for node in Nodes:
-	for neighbor in Nodes[node]:
-		pair = (node, Nodes[node][neighbor]["Management IP"])
-		Edges.append(pair)
-	
-#
-print("\n#######################")
-nodes_by_IP = []
-for node in Nodes:
-	print(node)
-	nodes_by_IP.append(node)
-	print(Nodes[node])
-	print("\n")
-print("#######################\n")
-#print("\nEdges: ", Edges)
-#print("\nNodes by IP address: ", nodes_by_IP)
+	#print(copy_IPs)
 
-tree, all_edges = spanning_tree_from_edges(Edges)
-print("\nTree: (start_node, dest_node) ", sorted(tree.edges()))
-#print("\nAll edges: ", all_edges)
+	x = "\nFor vlan " + str(v) + ", specify root node by IP address: "
+	root = input(x)
 
+	row["ip"] = root
+	copy_IPs.insert(0, copy_IPs.pop(copy_IPs.index(root)))
+	#print(copy_IPs)
+	row["order"] = copy_IPs
 
-#
-# get mapping of IP address and its local interfaces
-ips2ifaces = {}
-for node in Nodes:
-	ifaces = []
+	root_IPs[v] = row
 
-	for neighbor in Nodes[node]:
-		ifaces.append(Nodes[node][neighbor]["Local Node Interface"])
+	Edges = []
+	for ip in copy_IPs:
+		node = ip
+		for neighbor in Nodes[node]:
+			pair = (node, Nodes[node][neighbor]["Management IP"])
+			Edges.append(pair)
 
-	ips2ifaces[node] = ifaces
+	print("\nEdges: ", Edges)
 
-#print("\nIPs to their interfaces: ", ips2ifaces)
+	tree, all_edges = spanning_tree_from_edges(Edges)
+	print("\nTree: (start_node, dest_node) ", sorted(tree.edges()))
 
-##
-# create mapping of IP address to device ID
-ips2names = {}
-names2ips = {}
-for node in Nodes:
-	for neighbor in Nodes[node]:
-		name = Nodes[node][neighbor]["Name"]
-		ip = Nodes[node][neighbor]["Management IP"]
-		ips2names[ip] = name
-		names2ips[name] = ip
-
-#print("\nIPs to Names: ", ips2names)
-#print("\nNames to IPs: ", names2ips)
-
-
-
-# check which interfaces are missing
-missing_links = []
-for e in all_edges:
-	if e not in tree.edges():
-		missing_links.append(e)
-
-#print("\nMissing Links: ", missing_links)
-
-# create object of ip:iface that needs to be re-configured
-
-configIPs = {}
-for link in missing_links:
-	sIP, dIP = link
-	#print(sIP + " : " + dIP)
-
-	for node in Nodes:
-		if node == sIP:
-			for neighbor in Nodes[node]:
-				if Nodes[node][neighbor]["Management IP"] == dIP:
-					configIPs[sIP] = Nodes[node][neighbor]["Local Node Interface"]
-					configIPs[dIP] = Nodes[node][neighbor]["Adjacent Node Interface"]
-
-
-print("\nIPs and interfaces that need to be re-configured: ", configIPs)
-
-# re-configure trunk links -> take off vlan
-for ip in configIPs:
+	# ssh
 	# ssh into svi
 	username = "exam"
 	password = "exam"
@@ -218,7 +203,7 @@ for ip in configIPs:
 	handler.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 	try:
-		handler.connect(ip, username=username, password=password, look_for_keys=False, allow_agent=False)
+		handler.connect(root, username=username, password=password, look_for_keys=False, allow_agent=False)
 	except Exception as e:
 		print("\nException: ", str(e))
 		continue
@@ -228,32 +213,39 @@ for ip in configIPs:
 	shell.send("terminal length 0\n")  # forces terminal to print everything; no space needed
 	time.sleep(1)
 
-	print("\n##############################")
-	shell.send("enable\n")
-	time.sleep(1)
+	# enable
+	shell.send("en\n")
+	shell.send("exam\n")  # enable password
 
-	shell.send("exam\n")
-	time.sleep(1)
-
-	shell.send("show int trunk\n")  # before configuration
-	time.sleep(1)
-
-	# show spanning-tree vlan
-
-	shell.send("conf t\n")
-	command = "interface " + configIPs[ip] + "\n"
+	# before configuration
+	print("\nBEFORE CONFIG")
+	command = "show spanning-tree vlan " + str(v) + "\n"
 	shell.send(command)
-	shell.send("switchport trunk allowed vlan 1,20\n")  # remove vlan 10
-	shell.send("end\n")
-	time.sleep(3)
-
-	shell.send("show int trunk\n")  # after configuration
 	time.sleep(1)
 
 	output = shell.recv(65535)
 	output = output.decode("utf-8")
 	print(output)
 
-	# change interface configuration
+	# configure
+	shell.send("conf t\n")
+	time.sleep(1)
 
+	command = "spanning-tree vlan " + str(v) + " root primary\n"
+	shell.send(command)
+	time.sleep(1)
+
+	shell.send("end\n")
+	time.sleep(5)
+
+	# after configuration
+	print("\n####################")
+	print("\nAFTER CONFIG")
+	command = "show spanning-tree vlan " + str(v) + "\n"
+	shell.send(command)
+	time.sleep(1)
+
+	output = shell.recv(65535)
+	output = output.decode("utf-8")
+	print(output)
 
